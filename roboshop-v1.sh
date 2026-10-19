@@ -17,20 +17,20 @@ do
         --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=roboshop-$instance}]" \
         --query 'Instances[0].InstanceId' \
         --output text) || {
-            echo "Failed to create instance: $instance"
+            echo "ERROR: Failed to create $instance"
             continue
         }
 
     echo "$instance ID: $instance_id"
 
-    # Wait until instance is running
+    # Wait until the instance is running
     aws ec2 wait instance-running \
         --instance-ids "$instance_id" || {
-            echo "Instance failed to reach running state: $instance_id"
+            echo "ERROR: Instance failed to start"
             continue
         }
 
-    # Retrieve IP address based on instance type
+    # Retrieve IP address
     if [ "$instance" != "frontend" ]; then
 
         IP=$(aws ec2 describe-instances \
@@ -48,16 +48,16 @@ do
     fi
 
     if [ -z "$IP" ] || [ "$IP" = "None" ]; then
-        echo "Failed to retrieve IP for $instance"
+        echo "ERROR: Could not retrieve IP for $instance"
         continue
     fi
 
     echo "$instance IP: $IP"
 
-    # Set Route 53 record name
+    # Set DNS record name
     r53_record_name="$instance.$domain_name"
 
-    # Update Route 53 record
+    # Update Route 53
     aws route53 change-resource-record-sets \
         --hosted-zone-id "$hostedzone_id" \
         --change-batch "{
@@ -79,9 +79,9 @@ do
         }"
 
     if [ $? -eq 0 ]; then
-        echo "Route 53 record updated: $r53_record_name -> $IP"
+        echo "SUCCESS: $r53_record_name -> $IP"
     else
-        echo "Failed to update Route 53 record for $instance"
+        echo "ERROR: Route 53 update failed for $instance"
     fi
 
 done
